@@ -1,26 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 
 namespace Blockchain.Common.Models
 {
     public class Block
     {
-        private readonly Lazy<string> _dataString;
-        private Block PreviousBlock { get; }
-        public Hash Hash { get; }
-        public Hash PreviousHash { get; }
-        public int Number { get; }
-        public int Nonce { get; }
-        public string DataString => _dataString.Value;
-        
+        public Block PreviousBlock { get; set;}
+        public Hash Hash { get;set; }
+        public Hash PreviousHash { get; set;}
+        public int Number { get;set; }
+        public int Nonce { get; set;}
+        public List<Transaction> Transaction { get; set; }
+
+        public Block(Block block)
+        {
+            this.Hash = block.Hash;
+            this.Nonce = block.Nonce;
+            this.Number = block.Number;
+            this.Transaction = new List<Transaction>(block.Transaction);
+            this.PreviousBlock = block.PreviousBlock;
+            this.PreviousHash = block.PreviousHash;
+        }
+
+        public Block() { }
         public Block(
             int nonce,
-            TransactionSet transactionSet,
+            List<Transaction> transactions,
             Hash hash,
             Block previousBlock = null)
         {
-            if (transactionSet == null) throw new ArgumentNullException(nameof(transactionSet));
+            
+            if (transactions == null) throw new ArgumentNullException(nameof(transactions));
             if (hash == null) throw new ArgumentNullException(nameof(hash));
 
             if (previousBlock == null)
@@ -41,7 +53,7 @@ namespace Blockchain.Common.Models
             Nonce = nonce;
             Hash = hash;
             PreviousBlock = previousBlock;
-            _dataString = new Lazy<string>(transactionSet.GetDataString);
+            Transaction = new List<Transaction>(transactions);
         }
 
         public List<Block> GetChainAsList()

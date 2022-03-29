@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -46,8 +45,9 @@ namespace Blockchain.Bll.Implementation
             Random rng = new();
             Block previousBlock = null;
 
+            List<Transaction> transactions = GenerateTransactionSet(receiver, people, rng);
             TransactionSet transactionSet = new(
-                GenerateTransactionSet(receiver, people, rng)
+                transactions
             );
 
             Hash previousHash = (previousBlock != null)
@@ -70,7 +70,7 @@ namespace Blockchain.Bll.Implementation
 
             previousBlock = new Block(
                 currentNonce,
-                transactionSet,
+                transactions,
                 newHash,
                 previousBlock
             );
