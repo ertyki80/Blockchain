@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Newtonsoft.Json;
 
 namespace Blockchain.Common.Models
 {
@@ -16,12 +15,12 @@ namespace Blockchain.Common.Models
 
         public Block(Block block)
         {
-            this.Hash = block.Hash;
-            this.Nonce = block.Nonce;
-            this.Number = block.Number;
-            this.Transaction = new List<Transaction>(block.Transaction);
-            this.PreviousBlock = block.PreviousBlock;
-            this.PreviousHash = block.PreviousHash;
+            Hash = block.Hash;
+            Nonce = block.Nonce;
+            Number = block.Number;
+            Transaction = new List<Transaction>(block.Transaction);
+            PreviousBlock = block.PreviousBlock;
+            PreviousHash = block.PreviousHash;
         }
 
         public Block() { }
@@ -54,19 +53,6 @@ namespace Blockchain.Common.Models
             Hash = hash;
             PreviousBlock = previousBlock;
             Transaction = new List<Transaction>(transactions);
-        }
-
-        public List<Block> GetChainAsList()
-        {
-            List<Block> blocks = new List<Block>();
-            Block currentBlock = this;
-            
-            while (currentBlock != null)
-            {
-                blocks.Add(currentBlock);
-                currentBlock = currentBlock.PreviousBlock;
-            }
-            return blocks;
         }
 
     }

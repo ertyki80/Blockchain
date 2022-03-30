@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,105 +11,96 @@ namespace Blockchain.Bll.Implementation
 {
     public class BlockChainService: IDisposable
     {
-        private readonly SHA256Managed _sha256 = new();
-        private List<Block> _blockChain;
+        /// <summary>
+        /// Dispose sha instance
+        /// </summary>
         public void Dispose() => _sha256.Dispose();
-        private readonly int _startingZero;
-        private List<Transaction> _currentTransactions;
-        private Block _previousBlock;
-
         
+        /// <summary>
+        /// Sha256 manager for encrypt data
+        /// </summary>
+        private readonly SHA256Managed _sha256;
+
+        /// <summary>
+        /// Configurable params for hash:
+        /// ex: _startingZero:3 => 000b487b017aeb50ab08ca297cb009a05abac2c2e8a1220d3e23fe47183cc270
+        /// </summary>
+        private readonly int _startingZero;
+
+        /// <summary>
+        /// Constructor for Block Chain Service
+        /// </summary>
+        /// <param name="startingZero"></param>
         public BlockChainService(int startingZero = 0)
         {
+            _sha256 = new();
             _startingZero = startingZero;
-            _currentTransactions = new List<Transaction>();
-            _blockChain = new List<Block>();
-        }
-
-        /// <summary>
-        /// Validate transaction for amount money.
-        /// </summary>
-        /// <param name="receiver"></param>
-        /// <param name="submitter"></param>
-        /// <param name="amount"></param>
-        /// <exception cref="Exception"></exception>
-        private void ValidateTransaction(ref Person receiver,ref Person submitter,double amount)
-        {
-            if (submitter.AmountMoney < amount)
-                throw new Exception("Submitter not have enough money");
-            submitter.AmountMoney -= amount;
-            receiver.AmountMoney += amount;
-        }
-        
-        /// <summary>
-        /// Create transaction from receiver to submitter
-        /// </summary>
-        /// <param name="receiver"></param>
-        /// <param name="submitter"></param>
-        /// <param name="amount"></param>
-        /// <returns></returns>
-        public Transaction CreateTransaction(ref Person receiver,ref Person submitter, double amount)
-        {
-            ValidateTransaction(ref receiver, ref submitter, amount);
-            Transaction transaction = new Transaction(receiver, submitter, amount);
-            //Add transaction for processing in generate block
-            _currentTransactions.Add(transaction);
-            return transaction;
         }
 
         /// <summary>
         /// Create new block of transaction
         /// </summary>
-        /// <param name="previousBlock"></param>
-        /// <param name="transactions"></param>
-        /// <returns></returns>
-        public Block GenerateBlock()
+        public Block GenerateBlock(List<Transaction> transactions, Block previouslyBlock = null)
         {
            int currentNonce = 0;
-           Hash hash = GenerateHash(ref _currentTransactions,ref currentNonce,ref _previousBlock);
+           
+           Hash hash = GenerateHash(ref transactions,ref currentNonce, previouslyBlock?.Hash?.Value);
             
             Block currentBlock = new Block(
                 currentNonce,
-                _currentTransactions,
+                transactions,
                 hash,
-                _previousBlock
+                previouslyBlock
             );
-            
-            _blockChain.Add(currentBlock);
-            _currentTransactions.Clear();
-            _previousBlock = new Block(currentBlock);
-            
             return currentBlock;
         }
 
-        Hash GenerateHash(ref List<Transaction> transactionList,ref int nonce,ref Block previouslyBlock)
+        /// <summary>
+        /// Generate hash based on:
+        /// 1. "{currentNonce}_{transaction}"
+        /// This is for a block chan without a previous block
+        /// 2. "{currentNonce}_{transaction}_{PreviouslyHash}"
+        /// This is for a block chan with a previous block (help verified order of blocks)
+        /// </summary>
+        /// <param name="transactionList"></param>
+        /// <param name="nonce"></param>
+        /// <param name="PreviouslyHash"></param>
+        /// <returns></returns>
+        Hash GenerateHash(ref List<Transaction> transactionList,ref int nonce, string PreviouslyHash = null)
         {
             int currentNonce = 0;
             Console.WriteLine("Starting generate hash:");
             string transaction = JsonConvert.SerializeObject(transactionList);
             string zeros = new string('0', _startingZero);
             
-            // Need some optimization:
             Hash newHash = null;
-            while (true)
-            {
-                currentNonce++;
-                string forProcessing = $"{currentNonce}_{transaction}";
-                if(previouslyBlock != null)
-                    forProcessing = $"{currentNonce}_{transaction}_{previouslyBlock.Hash.Value}";
-                
-                string hash = GetHashSha256(forProcessing);
-                bool isValid = hash.StartsWith(zeros);
-                if (isValid)
+            Parallel.For(0, int.MaxValue,
+                (i,breakLoopState) =>
                 {
-                    newHash = new Hash(hash);
-                    break;
-                }
-            }
+                    currentNonce++;
+                    string forProcessing = $"{currentNonce}_{transaction}";
+                    if (PreviouslyHash != null)
+                        forProcessing = $"{currentNonce}_{transaction}_{PreviouslyHash}";
+
+                    string hash = GetHashSha256(forProcessing);
+                    bool isValid = hash.StartsWith(zeros);
+                    if (isValid)
+                    {
+                        newHash = new Hash(hash);
+                        breakLoopState.Break();
+                    }
+                });
+
             Console.WriteLine($"Generated hash: {newHash.Value}");
             nonce = currentNonce;
             return newHash;
         }
+        
+        /// <summary>
+        /// Just encrypt function
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
         public static string GetHashSha256(string text)
         {
             byte[] bytes = Encoding.Unicode.GetBytes(text);
@@ -120,29 +110,49 @@ namespace Blockchain.Bll.Implementation
             foreach (var b in hash) result = result + String.Format("{0:x2}", b);
             return result;
         }
-        
-        public void SaveBlockChain(
-            string name = null
-        )
+
+        /// <summary>
+        /// Save block chain to file
+        /// </summary>
+        /// <param name="lastBlockInChain"></param>
+        /// <param name="fileName"></param>
+        public void SaveBlockChain(Block lastBlockInChain,string fileName = null)
         {
-            string jsonString = System.Text.Json.JsonSerializer.Serialize(_blockChain);
+            List<Block> blocks = new List<Block>();
+            blocks.Add(lastBlockInChain);
+            Block temp = lastBlockInChain;
+            while (temp.PreviousBlock != null)
+            {
+                blocks.Add(temp.PreviousBlock);
+                temp = temp.PreviousBlock;
+            }
+            blocks.Reverse();
+            string jsonString = System.Text.Json.JsonSerializer.Serialize(blocks);
             DateTime now = DateTime.Now;
-            
-            string path =name ?? $"BlockChain({now.Day}_{now.Hour}_{now.Minute}).json";
+            string path =fileName ?? $"BlockChain ({now.Day}_{now.Hour}_{now.Minute}).json";
             using FileStream file = File.OpenWrite(path);
             byte[] bytes = Encoding.UTF8.GetBytes(jsonString);
             file.Write(bytes, 0, bytes.Length);
         }
 
+        /// <summary>
+        /// Open and validate block chain
+        /// </summary>
+        /// <param name="fileName"></param>
         public void OpenBlockChain(string fileName)
         {
             using StreamReader r = new(fileName);
             List<Block> blocks = JsonConvert.DeserializeObject<List<Block>>(r.ReadToEnd());
             List<Block> validBlocks = ValidateBlockChain(blocks);
-            if(blocks.Count == validBlocks.Count)
-                Console.WriteLine("Blocks are valid");
+            if(blocks != null && blocks.Count == validBlocks.Count)
+                Console.WriteLine("BlockChain are valid");
         }
 
+        /// <summary>
+        /// Validate chain of block for transaction and previously hash
+        /// </summary>
+        /// <param name="blocks"></param>
+        /// <returns></returns>
         private List<Block> ValidateBlockChain(List<Block> blocks)
         {
             List<Block> validBlocks = new List<Block>();
@@ -162,7 +172,6 @@ namespace Blockchain.Bll.Implementation
                 {
                     validBlocks.Add(block);
                 }
-                _blockChain.AddRange(validBlocks);
             }
             return validBlocks;
         }

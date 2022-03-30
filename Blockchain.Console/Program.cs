@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 using Blockchain.Bll.Implementation;
 using Blockchain.Common.Models;
 
@@ -10,44 +6,8 @@ namespace Blockchain.Console
 {
     class Program
     {
-        public static void RunTestOne()
+        /*static void Test_GenerateBlockWithStartingZeroN_BlockChain()
         {
-            int startingZero = 2;
-            BlockChainGeneratorConsoleService generatorConsoleService = new(startingZero);
-            PersonService personService = new PersonService();
-            Block blockChain = generatorConsoleService.GenerateBlockChain(personService.GeneratePeople().ToList());
-            
-            System.Console.Clear();
-            
-            StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.Append("[");
-            foreach (Block block in blockChain
-                .GetChainAsList()
-                .OrderBy(x => x.Number))
-            {
-                stringBuilder.Append("{");
-                stringBuilder.Append($"\"number\": \"{block.Number}\", ");
-                stringBuilder.Append($"\"nonce\": \"{block.Nonce}\", ");
-                stringBuilder.Append($"\"hash\": \"{block.Hash.Value}\", ");
-                stringBuilder.Append($"\"previousHash\": \"{block.PreviousHash.Value}\", ");
-                stringBuilder.Append($"\"Transactions\": \"{block.Transaction}\"");
-                stringBuilder.Append("},");
-                stringBuilder.AppendLine();
-            }
-            stringBuilder.Append("]");
-
-            DateTime now = DateTime.Now;
-            string path = $"{now.Day}_{now.Hour}_{now.Minute}.json";
-            using (FileStream file = File.OpenWrite(path))
-            {
-                byte[] bytes = Encoding.UTF8.GetBytes(stringBuilder.ToString());
-                file.Write(bytes, 0, bytes.Length);
-            }
-        }
-
-        static void RunSecondTest()
-        {
-           
             for (int i = 0; i < 20; i++)
             {
                 System.Console.WriteLine($"For starting zero : {i}");
@@ -65,36 +25,38 @@ namespace Blockchain.Console
                 System.Console.WriteLine($"Total Ms: {elapsedMs}");
             }
             //blockChainService.SaveBlockChain("Test.json");
-        }
+        }*/
         
         
-        
-        static void TestDateGenerate()
+        static void Test_GenerateAndSave2Blocks_BlockChain()
         {
+            //Service set up
+            TransactionService transactionService = new TransactionService();
+            BlockChainService blockChainService = new BlockChainService(2);
+            
+            //Persons:
             Person personOne = new Person("Alice",200);
             Person personSecond = new Person("Bob",200);
-            BlockChainService blockChainService = new BlockChainService(2);
-            blockChainService.CreateTransaction(ref personOne,ref  personSecond, 31.2);
-            blockChainService.CreateTransaction(ref personOne,ref  personSecond, 10.2);
-            Block block = blockChainService.GenerateBlock();
-            blockChainService.SaveBlockChain("Test.json");
+            
+            // Send and received money:
+            List<Transaction> transactions = new List<Transaction>();
+            
+            //BLOCK 1
+            transactions.Add(transactionService.CreateTransaction( personOne,  personSecond, 31.2));
+            transactions.Add(transactionService.CreateTransaction( personOne,  personSecond, 11.1));
+            Block block1 = blockChainService.GenerateBlock(transactions);
+            // END BLOCK 1
+            
+            //BLOCK 2
+            transactions.Add(transactionService.CreateTransaction( personSecond,  personOne, 10.0));
+            transactions.Add(transactionService.CreateTransaction( personOne,  personSecond, 20.0));
+            Block block2 = blockChainService.GenerateBlock(transactions,block1);
+            // END BLOCK 2
+            
+            blockChainService.SaveBlockChain(block2,"Test.json");
         }
         
-        static void TestForWorkAfterSave()
-        {
-            Person personOne = new Person("Alice",200);
-            Person personSecond = new Person("Bob",200);
-            BlockChainService blockChainService = new BlockChainService(2);
-            blockChainService.CreateTransaction(ref personOne,ref  personSecond, 31.2);
-            blockChainService.CreateTransaction(ref personOne, ref personSecond, 11.1);
-            Block block3 = blockChainService.GenerateBlock();
-            blockChainService.CreateTransaction(ref personOne,ref  personSecond, 12.2);
-            blockChainService.CreateTransaction(ref personOne, ref personSecond, 9.1);
-            Block block4 = blockChainService.GenerateBlock();
-            blockChainService.SaveBlockChain("Test.json");
-        }
-        
-        static void TestOpenBlockChain()
+        static void Test_ReadFromFile_BlockChain()
         {
             BlockChainService blockChainService = new BlockChainService(2);
             blockChainService.OpenBlockChain("Test.json");
@@ -102,13 +64,8 @@ namespace Blockchain.Console
         
         static void Main(string[] args)
         {
-            //RunTestOne();
-            //RunSecondTest();
-            TestForWorkAfterSave();
-
-            TestOpenBlockChain();
-            //TestDateGenerate();
-            
+            Test_GenerateAndSave2Blocks_BlockChain();
+            //Test_GenerateBlockWithStartingZeroN_BlockChain();
         }
     }
 
